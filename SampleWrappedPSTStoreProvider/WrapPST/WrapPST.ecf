@@ -1,0 +1,31 @@
+;Place this file in C:\Program Files\Microsoft Office\Office11\Addins
+;or                 C:\Program Files\Microsoft Office\Office12\Addins
+[General]
+Display Name=<DisplayName>
+Description=<Description>
+;Modify this path to point to the location of the extension dll.
+Path="WrpPST32.DLL"
+Entry Point=1
+Client Version=4.0
+Misc Flags=NoOptimizeInterfaceMap;MoreContexts;InstallCommandsEarly
+
+[Folder]
+Folder Class=IPF
+Events=AllCommands;InstallCommands
+Commands=MyButton
+
+;[Item]
+;Message Class=IPM
+;Item States=Modal;NonModal;Read;Compose
+;Events=OnWrite;OnWriteComplete;OnRead;OnReadComplete;OnSubmit;OnSubmitComplete;OnCheckNames;OnCheckNamesComplete;OnLoadAttachmentFromFile;OnSaveAttachmentToFile;OnOpenAttachment
+;Menu Drops=File;Edit;View;Insert;Format;Tools;Compose;Help;Main;Toolbar;Contact;Calendar;Note;Task;Journal;FileFolder
+;Events=AllCommands;InstallCommands;OnItemChange;OnCommand;InstallCommands;AddPropSheetPages;OnWrite;OnWriteComplete
+;Outlook Commands=All
+;Commands=MyButton
+
+[Command]
+MyButton=50003;My Button;Toolbar End Wizard
+
+[Strings]
+DisplayName=WrapPST Extension
+Description=This extension allows control over synchronization in the wrapped PST.
