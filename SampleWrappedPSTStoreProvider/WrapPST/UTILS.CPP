@@ -23,7 +23,7 @@ LONG GetRegistryValue(
 {
 	LONG lRes = ERROR_SUCCESS;
 
-	Log(true,_T("GetRegistryValue()\n"),lpszValue);
+	Log(true,_T("GetRegistryValue(%s)\n"),lpszValue);
 
 	*lppData = NULL;
 	DWORD cb = NULL;
@@ -66,6 +66,112 @@ LONG GetRegistryValue(
 	return lRes;
 }
 
+// Opens the mail key for the specified MAPI client, such as 'Microsoft Outlook' or 'ExchangeMAPI'
+// Pass NULL to open the mail key for the default MAPI client
+HKEY GetMailKey(LPTSTR szClient)
+{
+	Log(true,_T("Enter GetMailKey(%s)\n"),szClient?szClient:_T("Default"));
+	HRESULT hRes = S_OK;
+	LONG lRes = S_OK;
+	HKEY hMailKey = NULL;
+	BOOL bClientIsDefault = false;
+
+	// If szClient is NULL, we need to read the name of the default MAPI client
+	if (!szClient)
+	{
+		HKEY hDefaultMailKey = NULL;
+		lRes = RegOpenKeyEx(
+			HKEY_LOCAL_MACHINE,
+			_T("Software\\Clients\\Mail"),
+			NULL,
+			KEY_READ,
+			&hDefaultMailKey);
+		if (hDefaultMailKey)
+		{
+			DWORD dwKeyType = NULL;
+			lRes = GetRegistryValue(
+				hDefaultMailKey,
+				_T(""), // get the default value
+				&dwKeyType,
+				(LPVOID*) &szClient);
+			Log(true,_T("Default MAPI = %s\n"),szClient?szClient:_T("Default"));
+			bClientIsDefault = true;
+			RegCloseKey(hDefaultMailKey);
+		}
+	}
+
+	if (szClient)
+	{
+		TCHAR szMailKey[256];
+		hRes = StringCchPrintf(
+			szMailKey,
+			CCH(szMailKey),
+			_T("Software\\Clients\\Mail\\%s"),
+			szClient);
+
+		if (SUCCEEDED(hRes))
+		{
+			lRes = RegOpenKeyEx(
+				HKEY_LOCAL_MACHINE,
+				szMailKey,
+				NULL,
+				KEY_READ,
+				&hMailKey);
+		}
+	}
+	if (bClientIsDefault) delete[] szClient;
+
+	return hMailKey;
+} // GetMailKey
+
+// Gets MSI IDs for the specified MAPI client, such as 'Microsoft Outlook' or 'ExchangeMAPI'
+// Pass NULL to get the IDs for the default MAPI client
+// Allocates with new, delete with delete[]
+void GetMAPIMSIIDs(LPTSTR szClient, LPTSTR* lpszComponentID, LPTSTR* lpszAppLCID, LPTSTR* lpszOfficeLCID)
+{
+	Log(true,_T("GetMAPIMSIIDs()\n"));
+	LONG lRes = S_OK;
+
+	HKEY hKey = GetMailKey(szClient);
+
+	if (hKey)
+	{
+		DWORD dwKeyType = NULL;
+
+		if (lpszComponentID)
+		{
+			lRes = GetRegistryValue(
+				hKey,
+				_T("MSIComponentID"),
+				&dwKeyType,
+				(LPVOID*) lpszComponentID);
+			Log(true,_T("MSIComponentID = %s\n"),*lpszComponentID?*lpszComponentID:_T("<not found>"));
+		}
+
+		if (lpszAppLCID)
+		{
+			lRes = GetRegistryValue(
+				hKey,
+				_T("MSIApplicationLCID"),
+				&dwKeyType,
+				(LPVOID*) lpszAppLCID);
+			Log(true,_T("MSIApplicationLCID = %s\n"),*lpszAppLCID?*lpszAppLCID:_T("<not found>"));
+		}
+
+		if (lpszOfficeLCID)
+		{
+			lRes = GetRegistryValue(
+				hKey,
+				_T("MSIOfficeLCID"),
+				&dwKeyType,
+				(LPVOID*) lpszOfficeLCID);
+			Log(true,_T("MSIOfficeLCID = %s\n"),*lpszOfficeLCID?*lpszOfficeLCID:_T("<not found>"));
+		}
+
+		RegCloseKey(hKey);
+	}
+} // GetMAPIComponentID
+
 ///////////////////////////////////////////////////////////////////////////////
 // Function name   : GetMAPISVCPath
 // Description     : This will get the correct path to the MAPISVC.INF file.
@@ -74,23 +180,31 @@ LONG GetRegistryValue(
 //                   ULONG cchMAPIDir - size of the buffer
 void GetMAPISVCPath(LPTSTR szMAPIDir, ULONG cchMAPIDir)
 {
-	LONG lRes = S_OK;
+	Log(true,_T("Enter GetMAPISVCPath\n"));
 	BOOL bRet = false;
-	UINT uiLen = 0;
 	HINSTANCE hinstStub = NULL;
 
 	szMAPIDir[0] = '\0';	// Terminate String at pos 0 (safer if we fail below)
+
+	// Find some strings:
+	LPTSTR szComponentID = NULL;
+	LPTSTR szAppLCID = NULL;
+	LPTSTR szOfficeLCID = NULL;
+	
+	GetMAPIMSIIDs("Microsoft Outlook",&szComponentID,&szAppLCID,&szOfficeLCID);
 
 	// Call common code in mapistub.dll
 	hinstStub = LoadLibrary(_T("mapistub.dll"));
 	if (!hinstStub)
 	{
+		Log(true,_T("Did not find stub, trying mapi32.dll\n"));
 		// Try stub mapi32.dll if mapistub.dll missing
 		hinstStub = LoadLibrary(_T("mapi32.dll"));
 	}
 	
 	if (hinstStub)
 	{		
+		Log(true,_T("Found MAPI\n"));
 		LPFGETCOMPONENTPATH pfnFGetComponentPath;
 
 		pfnFGetComponentPath = (LPFGETCOMPONENTPATH)
@@ -98,42 +212,12 @@ void GetMAPISVCPath(LPTSTR szMAPIDir, ULONG cchMAPIDir)
 
 		if (pfnFGetComponentPath)
 		{
-			// Find some strings:
-			LPTSTR szAppLCID = NULL;
-			LPTSTR szOfficeLCID = NULL;
-
-			HKEY hMicrosoftOutlook = NULL;
-
-			lRes = RegOpenKeyEx(
-				HKEY_LOCAL_MACHINE,
-				_T("Software\\Clients\\Mail\\Microsoft Outlook"),
-				NULL,
-				KEY_READ,
-				&hMicrosoftOutlook);
-
-			if (hMicrosoftOutlook)
-			{
-				DWORD dwKeyType = NULL;
-
-				lRes = GetRegistryValue(
-					hMicrosoftOutlook,
-					_T("MSIApplicationLCID"),
-					&dwKeyType,
-					(LPVOID*) &szAppLCID);
-
-				lRes = GetRegistryValue(
-					hMicrosoftOutlook,
-					_T("MSIOfficeLCID"),
-					&dwKeyType,
-					(LPVOID*) &szOfficeLCID);
-
-				RegCloseKey(hMicrosoftOutlook);
-			}
+			Log(true,_T("Got FGetComponentPath\n"));
 
 			if (szAppLCID)
 			{
 				bRet = pfnFGetComponentPath(
-					"{FF1D0740-D227-11D1-A4B0-006008AF820E}", // msmapi32.dll
+					szComponentID,
 					szAppLCID,
 					szMAPIDir,
 					cchMAPIDir,
@@ -142,7 +226,7 @@ void GetMAPISVCPath(LPTSTR szMAPIDir, ULONG cchMAPIDir)
 			if ((!bRet || szMAPIDir[0] == _T('\0')) && szOfficeLCID)
 			{
 				bRet = pfnFGetComponentPath(
-					"{FF1D0740-D227-11D1-A4B0-006008AF820E}", // msmapi32.dll
+					szComponentID,
 					szOfficeLCID,
 					szMAPIDir,
 					cchMAPIDir,
@@ -151,14 +235,12 @@ void GetMAPISVCPath(LPTSTR szMAPIDir, ULONG cchMAPIDir)
 			if (!bRet || szMAPIDir[0] == _T('\0'))
 			{
 				bRet = pfnFGetComponentPath(
-					"{FF1D0740-D227-11D1-A4B0-006008AF820E}", // msmapi32.dll
+					szComponentID,
 					NULL,
 					szMAPIDir,
 					cchMAPIDir,
 					TRUE);
 			}
-			delete[] szOfficeLCID;
-			delete[] szAppLCID;
 		}
 		FreeLibrary(hinstStub);
 	}
@@ -178,12 +260,15 @@ void GetMAPISVCPath(LPTSTR szMAPIDir, ULONG cchMAPIDir)
 
 	if (szMAPIDir[0] == _T('\0'))
 	{
+		Log(true,_T("FGetComponentPath failed, loading system directory\n"));
 		// Fall back on System32
+		UINT uiLen = 0;
 		uiLen = GetSystemDirectory(szMAPIDir, cchMAPIDir);
 	}
 
-	if (uiLen && szMAPIDir[0] != _T('\0'))
+	if (szMAPIDir[0] != _T('\0'))
 	{
+		Log(true,_T("Using directory: %s\n"),szMAPIDir);
 		StringCchPrintf(
 			szMAPIDir,
 			cchMAPIDir,
@@ -191,6 +276,9 @@ void GetMAPISVCPath(LPTSTR szMAPIDir, ULONG cchMAPIDir)
 			szMAPIDir,
 			_T("MAPISVC.INF"));
 	}
+	delete[] szComponentID;
+	delete[] szOfficeLCID;
+	delete[] szAppLCID;
 }
 
 // $--HrSetProfileParameters----------------------------------------------

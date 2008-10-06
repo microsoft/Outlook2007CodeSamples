@@ -108,6 +108,8 @@ STDINITMETHODIMP MSProviderInit (
 
 	HMODULE hm = LoadLibrary("C:\\Program Files\\Common Files\\System\\MSMAPI\\1033\\MSPST32.dll" );
 	if (!hm) hm = LoadLibrary("C:\\Program Files\\Microsoft Office\\Office12\\MSPST32.dll" );
+	if (!hm) hm = LoadLibrary("C:\\Program Files (x86)\\Common Files\\System\\MSMAPI\\1033\\MSPST32.dll" );
+	if (!hm) hm = LoadLibrary("C:\\Program Files (x86)\\Microsoft Office\\Office12\\MSPST32.dll" );
 	Log(true,"LoadLibrary returned 0x%08X\n", hm);
 
 	LPMSPROVIDERINIT pMsProviderInit = NULL;
@@ -610,6 +612,8 @@ HRESULT STDAPICALLTYPE ServiceEntry (
 
 	HMODULE hm = LoadLibrary("C:\\Program Files\\Common Files\\System\\MSMAPI\\1033\\MSPST32.dll" );
 	if (!hm) hm = LoadLibrary("C:\\Program Files\\Microsoft Office\\Office12\\MSPST32.dll" );
+	if (!hm) hm = LoadLibrary("C:\\Program Files (x86)\\Common Files\\System\\MSMAPI\\1033\\MSPST32.dll" );
+	if (!hm) hm = LoadLibrary("C:\\Program Files (x86)\\Microsoft Office\\Office12\\MSPST32.dll" );
 
 	Log(true, "Got module 0x%08X\n", hm);
 	if (!hm) return E_OUTOFMEMORY;
