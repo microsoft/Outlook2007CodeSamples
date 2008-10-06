@@ -224,7 +224,7 @@ void GetMAPISVCPath(LPTSTR szMAPIDir, ULONG cchMAPIDir)
 	LPTSTR szAppLCID = NULL;
 	LPTSTR szOfficeLCID = NULL;
 	
-	GetMAPIMSIIDs("Microsoft Outlook",&szComponentID,&szAppLCID,&szOfficeLCID);
+	GetMAPIMSIIDs(_T("Microsoft Outlook"),&szComponentID,&szAppLCID,&szOfficeLCID);
 
 	// Call common code in mapistub.dll
 	hinstStub = LoadLibrary(_T("mapistub.dll"));
