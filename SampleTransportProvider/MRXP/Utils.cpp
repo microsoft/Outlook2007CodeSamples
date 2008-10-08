@@ -160,9 +160,9 @@ HKEY GetMailKey(LPTSTR szClient)
 // Gets MSI IDs for the specified MAPI client, such as 'Microsoft Outlook' or 'ExchangeMAPI'
 // Pass NULL to get the IDs for the default MAPI client
 // Allocates with new, delete with delete[]
-void GetMAPIMSIIDs(LPTSTR szClient, LPTSTR* lpszComponentID, LPTSTR* lpszAppLCID, LPTSTR* lpszOfficeLCID)
+void GetMapiMsiIds(LPTSTR szClient, LPTSTR* lpszComponentID, LPTSTR* lpszAppLCID, LPTSTR* lpszOfficeLCID)
 {
-	Log(true,_T("GetMAPIMSIIDs()\n"));
+	Log(true,_T("GetMapiMsiIds()\n"));
 	LONG lRes = S_OK;
 
 	HKEY hKey = GetMailKey(szClient);
@@ -205,6 +205,120 @@ void GetMAPIMSIIDs(LPTSTR szClient, LPTSTR* lpszComponentID, LPTSTR* lpszAppLCID
 	}
 } // GetMAPIComponentID
 
+BOOL GetComponentPath(LPFGETCOMPONENTPATH pfnFGetComponentPath,
+					  LPTSTR szComponent,
+					  LPTSTR szQualifier,
+					  TCHAR* szDllPath,
+					  DWORD cchDLLPath)
+{
+	BOOL bRet = false;
+
+	if (!pfnFGetComponentPath) return false;
+#ifdef UNICODE
+	int iRet = 0;
+	CHAR szAsciiPath[MAX_PATH] = {0};
+	char szAnsiComponent[MAX_PATH] = {0};
+	char szAnsiQualifier[MAX_PATH] = {0};
+	iRet = WideCharToMultiByte(CP_ACP,0,szComponent,(int) -1,szAnsiComponent,CCH(szAnsiComponent),NULL,NULL);
+	iRet = WideCharToMultiByte(CP_ACP,0,szQualifier,(int) -1,szAnsiQualifier,CCH(szAnsiQualifier),NULL,NULL);
+
+	bRet = pfnFGetComponentPath(
+		szAnsiComponent,
+		szAnsiQualifier,
+		szAsciiPath,
+		CCH(szAsciiPath),
+		TRUE);
+	iRet = MultiByteToWideChar(
+		CP_ACP,
+		0,
+		szAsciiPath,
+		CCH(szAsciiPath),
+		szDllPath,
+		cchDLLPath);
+#else
+	bRet = pfnFGetComponentPath(
+		szComponent,
+		szQualifier,
+		szDllPath,
+		cchDLLPath,
+		TRUE);
+#endif
+	return bRet;
+} // GetComponentPath
+
+void GetMAPIPath(LPTSTR szClient, LPTSTR szMAPIPath, ULONG cchMAPIPath)
+{
+	BOOL bRet = false;
+	HINSTANCE hinstStub = NULL;
+
+	szMAPIPath[0] = '\0'; // Terminate String at pos 0 (safer if we fail below)
+
+	// Find some strings:
+	LPTSTR szComponentID = NULL;
+	LPTSTR szAppLCID = NULL;
+	LPTSTR szOfficeLCID = NULL;
+	
+	GetMapiMsiIds(szClient,&szComponentID,&szAppLCID,&szOfficeLCID);
+
+	if (szComponentID)
+	{
+		// Call common code in mapistub.dll
+		hinstStub = LoadLibrary(_T("mapistub.dll"));
+		if (!hinstStub)
+		{
+			Log(true,_T("Did not find stub, trying mapi32.dll\n"));
+			// Try stub mapi32.dll if mapistub.dll missing
+			hinstStub = LoadLibrary(_T("mapi32.dll"));
+		}
+
+		if (hinstStub)
+		{		
+			Log(true,_T("Found MAPI\n"));
+			LPFGETCOMPONENTPATH pfnFGetComponentPath;
+
+			pfnFGetComponentPath = (LPFGETCOMPONENTPATH)
+				GetProcAddress(hinstStub, "FGetComponentPath");
+
+			if (pfnFGetComponentPath)
+			{
+				Log(true,_T("Got FGetComponentPath\n"));
+				if (szAppLCID)
+				{
+					bRet = GetComponentPath(
+						pfnFGetComponentPath,
+						szComponentID,
+						szAppLCID,
+						szMAPIPath,
+						cchMAPIPath);
+				}
+				if ((!bRet || szMAPIPath[0] == _T('\0')) && szOfficeLCID)
+				{
+					bRet = GetComponentPath(
+						pfnFGetComponentPath,
+						szComponentID,
+						szOfficeLCID,
+						szMAPIPath,
+						cchMAPIPath);
+				}
+				if (!bRet  || szMAPIPath[0] == _T('\0'))
+				{
+					bRet = GetComponentPath(
+						pfnFGetComponentPath,
+						szComponentID,
+						NULL,
+						szMAPIPath,
+						cchMAPIPath);
+				}
+			}
+			FreeLibrary(hinstStub);
+		}
+	}
+
+	delete[] szComponentID;
+	delete[] szOfficeLCID;
+	delete[] szAppLCID;
+} // GetMAPIPath
+
 ///////////////////////////////////////////////////////////////////////////////
 // Function name   : GetMAPISVCPath
 // Description     : This will get the correct path to the MAPISVC.INF file.
@@ -214,72 +328,11 @@ void GetMAPIMSIIDs(LPTSTR szClient, LPTSTR* lpszComponentID, LPTSTR* lpszAppLCID
 void GetMAPISVCPath(LPTSTR szMAPIDir, ULONG cchMAPIDir)
 {
 	Log(true,_T("Enter GetMAPISVCPath\n"));
-	BOOL bRet = false;
-	HINSTANCE hinstStub = NULL;
 
-	szMAPIDir[0] = '\0';	// Terminate String at pos 0 (safer if we fail below)
-
-	// Find some strings:
-	LPTSTR szComponentID = NULL;
-	LPTSTR szAppLCID = NULL;
-	LPTSTR szOfficeLCID = NULL;
-	
-	GetMAPIMSIIDs(_T("Microsoft Outlook"),&szComponentID,&szAppLCID,&szOfficeLCID);
-
-	// Call common code in mapistub.dll
-	hinstStub = LoadLibrary(_T("mapistub.dll"));
-	if (!hinstStub)
-	{
-		Log(true,_T("Did not find stub, trying mapi32.dll\n"));
-		// Try stub mapi32.dll if mapistub.dll missing
-		hinstStub = LoadLibrary(_T("mapi32.dll"));
-	}
-	
-	if (hinstStub)
-	{		
-		Log(true,_T("Found MAPI\n"));
-		LPFGETCOMPONENTPATH pfnFGetComponentPath;
-
-		pfnFGetComponentPath = (LPFGETCOMPONENTPATH)
-			GetProcAddress(hinstStub, "FGetComponentPath");
-
-		if (pfnFGetComponentPath)
-		{
-			Log(true,_T("Got FGetComponentPath\n"));
-
-			if (szAppLCID)
-			{
-				bRet = pfnFGetComponentPath(
-					szComponentID,
-					szAppLCID,
-					szMAPIDir,
-					cchMAPIDir,
-					TRUE);
-			}
-			if ((!bRet || szMAPIDir[0] == _T('\0')) && szOfficeLCID)
-			{
-				bRet = pfnFGetComponentPath(
-					szComponentID,
-					szOfficeLCID,
-					szMAPIDir,
-					cchMAPIDir,
-					TRUE);
-			}
-			if (!bRet || szMAPIDir[0] == _T('\0'))
-			{
-				bRet = pfnFGetComponentPath(
-					szComponentID,
-					NULL,
-					szMAPIDir,
-					cchMAPIDir,
-					TRUE);
-			}
-		}
-		FreeLibrary(hinstStub);
-	}
+	GetMAPIPath(_T("Microsoft Outlook"),szMAPIDir,cchMAPIDir);
 
 	// We got the path to msmapi32.dll - need to strip it
-	if (bRet && szMAPIDir[0] != _T('\0'))
+	if (szMAPIDir[0] != _T('\0'))
 	{
 		LPTSTR lpszSlash = NULL;
 		LPTSTR lpszCur = szMAPIDir;
@@ -309,9 +362,6 @@ void GetMAPISVCPath(LPTSTR szMAPIDir, ULONG cchMAPIDir)
 			szMAPIDir,
 			_T("MAPISVC.INF"));
 	}
-	delete[] szComponentID;
-	delete[] szOfficeLCID;
-	delete[] szAppLCID;
 }
 
 // $--HrSetProfileParameters----------------------------------------------
