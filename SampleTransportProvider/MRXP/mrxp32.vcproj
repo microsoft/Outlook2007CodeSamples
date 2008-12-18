@@ -5,6 +5,7 @@
 	Name="mrxp32"
 	ProjectGUID="{E30C96A5-770F-43E6-9563-6733AA3593A3}"
 	RootNamespace="mrxp32"
+	TargetFrameworkVersion="0"
 	>
 	<Platforms>
 		<Platform
@@ -81,6 +82,7 @@
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
 				ModuleDefinitionFile=".\mrxp32.def"
+				GenerateDebugInformation="true"
 				ProgramDatabaseFile=".\Release/mrxp32.pdb"
 				SetChecksum="true"
 				RandomizedBaseAddress="1"
@@ -369,6 +371,7 @@
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
 				ModuleDefinitionFile=".\mrxp32.def"
+				GenerateDebugInformation="true"
 				ProgramDatabaseFile=".\Release/mrxp32.pdb"
 				SetChecksum="true"
 				RandomizedBaseAddress="1"
