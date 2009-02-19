@@ -35,6 +35,11 @@
 #define MSG_EXT				_T(".MSG")
 #define DEFAULT_FILENAME	_T("TEMP.MSG")
 
+// http://msdn2.microsoft.com/en-us/library/bb820947.aspx
+#define STORE_ITEMPROC			((ULONG) 0x00200000)
+#define ITEMPROC_FORCE			((ULONG) 0x00000800)
+#define NON_EMS_XP_SAVE			((ULONG) 0x00001000)
+
 DEFINE_GUID(CLSID_MailMessage,
 			0x00020D0B,
 			0x0000, 0x0000, 0xC0, 0x00, 0x0, 0x00, 0x0, 0x00, 0x00, 0x46);

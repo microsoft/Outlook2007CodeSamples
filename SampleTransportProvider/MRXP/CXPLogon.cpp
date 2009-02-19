@@ -603,7 +603,8 @@ STDMETHODIMP CXPLogon::StartMessage(ULONG		/*ulFlags*/,
 			hRes = lpMessage->SetProps(NUM_XP_SETPROPS, spvTransportStamped, NULL);
 			if (SUCCEEDED(hRes))
 			{
-				hRes = lpMessage->SaveChanges(0);
+				// Pass ITEMPROC_FORCE | NON_EMS_XP_SAVE to force the PST to run rules on this message.
+				hRes = lpMessage->SaveChanges(KEEP_OPEN_READWRITE | ITEMPROC_FORCE | NON_EMS_XP_SAVE);
 				if (SUCCEEDED(hRes))
 				{
 					BOOL bRet = DeleteFile(pszNewMailFile);
