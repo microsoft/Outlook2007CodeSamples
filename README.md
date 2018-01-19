@@ -4,8 +4,6 @@
 
 MAPI code samples for Microsoft Outlook.
 
-# [Click here to download the source for Outlook 2007 MAPI Samples](http://outlookmapisamples.codeplex.com/SourceControl/ListDownloadableCommits.aspx#DownloadLatest)
-
 Documentation for these samples may be found on the [MSDN](http://msdn.microsoft.com/en-us/library/cc839588.aspx).
 
 **Quick Details**
